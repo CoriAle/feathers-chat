@@ -1,16 +1,18 @@
 //Estableciendo conección a socketio
-const socket = io();
 
-//Inicializando nuestro cliente feathers a través de socket
+
+// Establish a Socket.io connection
+//Inicializando nuestro client feathers a través de socket
+const socket = io();
 //con hooks y autenticanción
 
 const client = feathers();
 
-cliente.configure(feathers.socketio(socket));
+client.configure(feathers.socketio(socket));
 
 //Localstorage para lamacenar el token de login
 
-cliente.configure(feathers.authentication({
+client.configure(feathers.authentication({
 	storage: window.localStorage
 }));
 
@@ -137,7 +139,7 @@ const addMessage = message=>{
 //Mostrar la página de login
 
 const showLogin = (error={})=>{
-	if(document.querySelector('.login').length){
+	if(document.querySelector('.login') && document.querySelector('.login').length){
 		document.querySelector('.heading').insertAdjacentHTML('beforeend', `<p>There was an error: ${error.message}</p>` );
 
 	}
@@ -163,7 +165,7 @@ const showChat = async ()=>{
 	messages.data.reverse().forEach(addMessage)
 
 	//encuentra a doso los usuarios
-	const user = await cliente.service('users').find();
+	const user = await client.service('users').find();
 
 	user.data.forEach(addUser);
 }
@@ -189,7 +191,7 @@ const login = async credentials =>{
 		}
 		else{
 			//Si está la información de login, agregar la estrategia a usar para login
-			const payload = new Object.assign({strategy: 'local', credentials});
+			const payload =  Object.assign({strategy: 'local'}, credentials);
 
 			await client.authenticate(payload);
 		}
@@ -203,3 +205,50 @@ const login = async credentials =>{
 		showLogin(e);
 	}
 }
+
+document.addEventListener('click', async ev=>{
+	switch (ev.target.id) {
+		case 'signup':
+			//Crear un nuevo usuario y loguearlos
+			const credentials = getCredentials();
+
+			//Primero crear el usuario
+
+			await client.service('users').create(credentials);
+
+			//Si tiene éxito loguealos
+			await login(credentials);
+			break;
+		case 'login':
+			const user = getCredentials();
+			await login(user);
+			break;
+		case 'logout':
+			await client.logout();
+			document.getElementById('app').innerHTML = loginHTML;
+	}
+
+});
+document.addEventListener('submit', async ev=>{
+	if(ev.target.id === 'send-message'){
+		//Este es el campo de mensaje
+		const input = document.querySelector('[name="text"]');
+
+		ev.preventDefault();
+
+		//crear un nuevo mensaje y luego limpir el input
+		await client.service('messages').create({
+			text: input.value
+		});
+		input.value = "";
+	}
+});
+
+//Esccha el evento create y agrega un nuevo mensage en tiempo real
+
+client.service('messages').on('created', addMessage);
+
+//También veremos cundo un nuevo usuario sea creado en tiempo real
+client.service('user').on('created', addUser);
+
+login();
